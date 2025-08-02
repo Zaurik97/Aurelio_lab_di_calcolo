@@ -1,0 +1,159 @@
+PROGRAM autovalore
+
+    IMPLICIT NONE
+
+    REAL(KIND=8), ALLOCATABLE :: matrice(:,:)             
+    REAL(KIND=8), ALLOCATABLE :: valori_sqrt(:), valori_rapporto(:)
+    CHARACTER(LEN=:), ALLOCATABLE :: nome_file 
+    INTEGER :: i, j, n, limite, unita_file
+
+    ALLOCATE(CHARACTER(LEN=20) :: nome_file)
+    nome_file = "dati.dat"
+    unita_file = 10
+
+    limite = 1000
+
+    PRINT *, "Inserire la dimensione della matrice:"
+    READ *, n
+
+    ALLOCATE(matrice(n, n))!allcoazione dinamica della memoria per dei vettori di lunghezza variabile in runtime
+    ALLOCATE(valori_sqrt(limite), valori_rapporto(limite))
+
+    CALL InizializzazioneMatrice(matrice, n)
+
+    PRINT *, "La matrice inserita è:"
+    DO i = 1, n
+        PRINT *, (matrice(i, j), j = 1, n)
+    END DO
+
+    OPEN(unit=unita_file, file=nome_file, status='replace')
+
+    ! Intestazione
+    WRITE(unita_file, '(A)') "# iterazione   metodo_sqrt              metodo_rapporto"
+
+    !CALL CalcolaAutovalori(matrice, n)!massimo autovalore con metodo classico
+    CALL trovaMaxAutovaloreSQRT(matrice, n, limite, valori_sqrt)
+    CALL trovaMaxAutovaloreRapporto(matrice, n, limite, valori_rapporto)
+
+    DO i = 1, limite !scrivo i risultati nel file tutti nello stesso momento
+        WRITE(unita_file, '(I5, F25.15, F25.15)') i, valori_sqrt(i), valori_rapporto(i)
+    END DO
+
+    PRINT *, "Risultati scritti con successo nel file."
+
+    DEALLOCATE(matrice)!libero la memoria dinamicamente assegnata
+    DEALLOCATE(valori_sqrt, valori_rapporto)
+    DEALLOCATE(nome_file)
+
+CONTAINS
+
+SUBROUTINE InizializzazioneMatrice(mat, n)
+    REAL(KIND=8), INTENT(INOUT) :: mat(:,:)
+    INTEGER, INTENT(IN) :: n
+    DOUBLE PRECISION :: entrateMatrice
+    INTEGER :: i, j
+
+    DO i = 1, n
+        DO j = 1, n
+            PRINT *, "Inserisci l'elemento (", i, ",", j, "):"
+            READ *, entrateMatrice
+            mat(i, j) = REAL(entrateMatrice, KIND=8)
+        END DO
+    END DO
+END SUBROUTINE InizializzazioneMatrice
+
+SUBROUTINE trovaMaxAutovaloreSQRT(mat, n, limit, risultati)
+    REAL(KIND=8), INTENT(INOUT) :: mat(:,:)
+    INTEGER, INTENT(IN) :: n, limit
+    REAL(KIND=8), INTENT(OUT) :: risultati(limit)
+    INTEGER :: i, j, l
+    DOUBLE PRECISION :: trace, maxAutovalore
+
+    l = limit
+
+    DO i = 1, l
+        trace = 0.0_8
+        DO j = 1, n
+            trace = trace + mat(j, j)**i
+        END DO
+        maxAutovalore = trace ** (1.0_8 / REAL(i, KIND=8))
+        risultati(i) = maxAutovalore  !assegno prima
+
+        IF (i > 1 .AND. risultati(i) > risultati(i-1)) THEN
+            l = i - 1
+            risultati(i) = risultati(l)
+        END IF
+    END DO
+
+    PRINT '(A, F25.15)', "Valore finale (metodo radice):", risultati(l)
+END SUBROUTINE trovaMaxAutovaloreSQRT
+
+SUBROUTINE trovaMaxAutovaloreRapporto(mat, n, limit, risultati)
+    REAL(KIND=8), INTENT(INOUT) :: mat(:,:)
+    INTEGER, INTENT(IN) :: n, limit
+    REAL(KIND=8), INTENT(OUT) :: risultati(limit)
+    INTEGER :: i, j, l
+    DOUBLE PRECISION :: traceN, traceD, maxAutovalore
+
+    l = limit
+
+    DO i = 1, l
+        traceN = 0.0_8
+        traceD = 0.0_8
+        DO j = 1, n
+            traceN = traceN + mat(j, j)**(i+1)
+            traceD = traceD + mat(j, j)**i
+        END DO
+
+        IF (traceD == 0.0_8 .OR. (.NOT. traceD == traceD .OR. ABS(traceN) >= HUGE(traceN)) ) THEN
+            risultati(i) = 0.0_8
+            EXIT  ! interrompo il ciclo cosí da evitare la propagazione NaN
+        ELSE
+            maxAutovalore = traceN / traceD
+        
+            ! controllo anche il risultato
+            IF (.NOT. maxAutovalore == maxAutovalore) THEN
+                risultati(i) = 0.0_8
+                EXIT
+            ELSE
+                risultati(i) = maxAutovalore
+            END IF
+        END IF
+    END DO
+    
+    PRINT '(A, F25.15)', "Valore finale (metodo rapporto):", maxAutovalore
+END SUBROUTINE trovaMaxAutovaloreRapporto
+
+    ! Funzione per calcolare gli autovalori nel modo classico
+SUBROUTINE CalcolaAutovalori(mat,n)
+        REAL(KIND=8), INTENT(INOUT) :: mat(:,:)
+        INTEGER, INTENT(IN) :: n
+        REAL(KIND=8), ALLOCATABLE :: autovalori(:)
+        REAL :: maxAutovalore
+        CHARACTER(LEN=1) :: jobz, uplo
+        INTEGER :: info
+
+        ! Allocazione della variabile per gli autovalori
+        ALLOCATE(autovalori(n))
+
+        ! Configurazione per LAPACK
+        jobz = 'N'  ! 'N' = calcola solo gli autovalori, 'V' = calcola anche gli autovettori
+        uplo = 'U'  ! 'U' = usa la parte superiore della matrice, 'L' = usa inferiore
+
+        ! Calcolo degli autovalori con DSYEV
+        CALL DSYEV(jobz, uplo, n, mat, n, autovalori, info)
+
+        ! Controllo il risultato
+        IF (info /= 0) THEN
+            PRINT *, "Errore nella diagonalizzazione: codice", info
+            STOP "Errore durante il calcolo degli autovalori"
+        ELSE
+            maxAutovalore = MAXVAL(autovalori)
+            DO i = 1, n
+                WRITE(unita_file, '(I4, F25.15)') i, maxAutovalore
+            END DO
+            PRINT '(A, F25.15)',"il valore dell´autovalore massimo trovato col metodo classico é:",maxAutovalore
+        END IF
+    END SUBROUTINE CalcolaAutovalori
+
+END PROGRAM autovalore
