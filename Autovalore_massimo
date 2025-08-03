@@ -16,7 +16,7 @@ PROGRAM autovalore
     PRINT *, "Inserire la dimensione della matrice:"
     READ *, n
 
-    ALLOCATE(matrice(n, n))!allcoazione dinamica della memoria per dei vettori di lunghezza variabile in runtime
+    ALLOCATE(matrice(n, n))!allocazione dinamica della memoria
     ALLOCATE(valori_sqrt(limite), valori_rapporto(limite))
 
     CALL InizializzazioneMatrice(matrice, n)
@@ -149,9 +149,6 @@ SUBROUTINE CalcolaAutovalori(mat,n)
             STOP "Errore durante il calcolo degli autovalori"
         ELSE
             maxAutovalore = MAXVAL(autovalori)
-            DO i = 1, n
-                WRITE(unita_file, '(I4, F25.15)') i, maxAutovalore
-            END DO
             PRINT '(A, F25.15)',"il valore dell´autovalore massimo trovato col metodo classico é:",maxAutovalore
         END IF
     END SUBROUTINE CalcolaAutovalori
