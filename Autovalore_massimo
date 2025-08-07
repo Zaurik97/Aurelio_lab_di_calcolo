@@ -63,65 +63,91 @@ SUBROUTINE InizializzazioneMatrice(mat, n)
 END SUBROUTINE InizializzazioneMatrice
 
 SUBROUTINE trovaMaxAutovaloreSQRT(mat, n, limit, risultati)
-    REAL(KIND=8), INTENT(INOUT) :: mat(:,:)
+    REAL(KIND=8), INTENT(IN) :: mat(:,:)
     INTEGER, INTENT(IN) :: n, limit
     REAL(KIND=8), INTENT(OUT) :: risultati(limit)
-    INTEGER :: i, j, l
-    DOUBLE PRECISION :: trace, maxAutovalore
+    REAL(KIND=8), ALLOCATABLE :: Ak(:,:), temp(:,:)
+    INTEGER :: i, k
+    REAL(KIND=8) :: trace, valore_corrente, ultimo_valido
 
-    l = limit
+    ALLOCATE(Ak(n,n), temp(n,n))
+    Ak = mat
 
-    DO i = 1, l
+    ultimo_valido = 0.0_8  
+
+    DO k = 1, limit
+
         trace = 0.0_8
-        DO j = 1, n
-            trace = trace + mat(j, j)**i
+        DO i = 1, n
+            trace = trace + Ak(i, i)
         END DO
-        maxAutovalore = trace ** (1.0_8 / REAL(i, KIND=8))
-        risultati(i) = maxAutovalore  !assegno prima
 
-        IF (i > 1 .AND. risultati(i) > risultati(i-1)) THEN
-            l = i - 1
-            risultati(i) = risultati(l)
+        valore_corrente = trace ** (1.0_8 / REAL(k, KIND=8))
+
+        IF (.NOT. (valore_corrente == valore_corrente) .OR. ABS(valore_corrente) >= HUGE(valore_corrente)) THEN
+            risultati(k) = ultimo_valido
+        ELSE
+            risultati(k) = valore_corrente
+            ultimo_valido = valore_corrente
         END IF
+
+        temp = MATMUL(Ak, mat)
+        Ak = temp
     END DO
 
-    PRINT '(A, F25.15)', "Valore finale (metodo radice):", risultati(l)
+    DEALLOCATE(Ak, temp)
+
+    PRINT '(A, F25.15)', "Valore finale (metodo radice):", ultimo_valido
 END SUBROUTINE trovaMaxAutovaloreSQRT
 
 SUBROUTINE trovaMaxAutovaloreRapporto(mat, n, limit, risultati)
-    REAL(KIND=8), INTENT(INOUT) :: mat(:,:)
+    REAL(KIND=8), INTENT(IN) :: mat(:,:)
     INTEGER, INTENT(IN) :: n, limit
     REAL(KIND=8), INTENT(OUT) :: risultati(limit)
-    INTEGER :: i, j, l
-    DOUBLE PRECISION :: traceN, traceD, maxAutovalore
+    REAL(KIND=8), ALLOCATABLE :: Ak(:,:), temp(:,:)
+    INTEGER :: i, k
+    REAL(KIND=8) :: trace_k, trace_k1, valore_corrente, ultimo_valido
 
-    l = limit
+    ALLOCATE(Ak(n,n), temp(n,n))
+    Ak = mat
 
-    DO i = 1, l
-        traceN = 0.0_8
-        traceD = 0.0_8
-        DO j = 1, n
-            traceN = traceN + mat(j, j)**(i+1)
-            traceD = traceD + mat(j, j)**i
+    ultimo_valido = 0.0_8  
+
+    DO k = 1, limit
+
+        trace_k = 0.0_8
+        DO i = 1, n
+            trace_k = trace_k + Ak(i, i)
         END DO
 
-        IF (traceD == 0.0_8 .OR. (.NOT. traceD == traceD .OR. ABS(traceN) >= HUGE(traceN)) ) THEN
-            risultati(i) = 0.0_8
-            EXIT  ! interrompo il ciclo cosí da evitare la propagazione NaN
+
+        temp = MATMUL(Ak, mat)
+
+
+        trace_k1 = 0.0_8
+        DO i = 1, n
+            trace_k1 = trace_k1 + temp(i, i)
+        END DO
+
+        IF (trace_k /= 0.0_8) THEN
+            valore_corrente = trace_k1 / trace_k
         ELSE
-            maxAutovalore = traceN / traceD
-        
-            ! controllo anche il risultato
-            IF (.NOT. maxAutovalore == maxAutovalore) THEN
-                risultati(i) = 0.0_8
-                EXIT
-            ELSE
-                risultati(i) = maxAutovalore
-            END IF
+            valore_corrente = 0.0_8
         END IF
+
+        IF (.NOT. (valore_corrente == valore_corrente) .OR. ABS(valore_corrente) >= HUGE(valore_corrente)) THEN
+            risultati(k) = ultimo_valido
+        ELSE
+            risultati(k) = valore_corrente
+            ultimo_valido = valore_corrente
+        END IF
+
+        Ak = temp
     END DO
-    
-    PRINT '(A, F25.15)', "Valore finale (metodo rapporto):", maxAutovalore
+
+    DEALLOCATE(Ak, temp)
+
+    PRINT '(A, F25.15)', "Valore finale (metodo rapporto):", ultimo_valido
 END SUBROUTINE trovaMaxAutovaloreRapporto
 
     ! Funzione per calcolare gli autovalori nel modo classico
